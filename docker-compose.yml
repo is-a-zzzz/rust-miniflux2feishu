@@ -11,8 +11,8 @@ services:
       - WEBHOOK_URL=${WEBHOOK_URL}
       # Miniflux 服务器地址 (可选)
       - MINIFLUX_URL=${MINIFLUX_URL:-}
-      # 日志级别 (可选，默认: info)
-      - RUST_LOG=${RUST_LOG:-info}
+      # 日志级别 (可选，默认: warn)
+      - RUST_LOG=${RUST_LOG:-warn}
       # 监听地址 (可选，默认: 0.0.0.0)
       - IP=${IP:-0.0.0.0}
       # 监听端口 (可选，默认: 8083)
@@ -20,3 +20,9 @@ services:
     # 或者直接使用 env_file（推荐）
     # env_file:
     #   - .env
+    # Docker 日志轮转配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "256k"
+        max-file: "5"

@@ -18,10 +18,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 解析命令行参数
     let args = Args::parse();
 
-    // 初始化日志系统
+    // 初始化日志系统（输出到 stdout，由 Docker 负责日志轮转）
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn".into()),
         )
         .init();
 

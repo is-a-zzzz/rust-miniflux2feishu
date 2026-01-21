@@ -54,7 +54,7 @@ pub fn build_lark_payload(entry: &MinifluxEntry, miniflux_url: &str) -> LarkMess
 
     // Miniflux文章地址
     if !miniflux_url.is_empty() {
-        let miniflux_entry_url = format!("{}/rss/feed/{}/entry/{}", miniflux_url.trim_end_matches('/'), entry.feed_id, entry.id);
+        let miniflux_entry_url = format!("{}/feed/{}/entry/{}", miniflux_url.trim_end_matches('/'), entry.feed_id, entry.id);
         tracing::info!("构造 Miniflux URL: {} (feed_id={}, entry_id={})", miniflux_entry_url, entry.feed_id, entry.id);
         content.push(vec![
             LarkElement::A {

@@ -125,7 +125,8 @@ curl -X POST http://127.0.0.1:8083/webhook \
 
 - 最多重试 3 次
 - 指数退避：1秒 → 2秒 → 4秒
-- 消息间延迟 2.5 秒
+- 消息间延迟 1 秒（避免触发飞书 5 req/sec 限流）
+- Webhook 串行处理（全局锁，防止并发冲突）
 
 ## Docker 镜像
 
@@ -179,6 +180,43 @@ cargo test
 # 构建
 cargo build --release
 ```
+
+## 技术实现
+
+### HTTP 客户端选择
+
+使用 **ureq**（同步）而非 reqwest（异步），原因：
+
+1. **稳定性问题解决**：reqwest 在 Docker + musl 环境中处理连续请求时存在 bug
+   - 症状：第 6-7 个请求后卡住，既无响应也无超时
+   - 根本原因：Tokio 异步运行时 + rustls + musl 的交互问题
+   - 解决方案：`spawn_blocking` + ureq 同步客户端
+
+2. **性能权衡**
+   - ureq：简单可靠，每请求独立线程
+   - reqwest：异步高性能，但环境兼容性问题
+   - Webhook 场景：低频请求，同步性能足够
+
+### 构建优化
+
+Docker 多阶段构建 + 缓存层优化：
+
+```dockerfile
+# 1. 先复制 Cargo.toml，构建依赖（可缓存）
+COPY Cargo.toml Cargo.lock ./
+RUN cargo install --path . --root /
+
+# 2. 再复制源码，只重编译自己的代码
+COPY src ./src
+RUN touch src/main.rs && cargo install --path . --root /
+```
+
+**优势**：依赖变更时才重新编译，源码改动只需 ~50 秒。
+
+### 相关问题
+
+- [reqwest connection pool issues](https://github.com/seanmonstar/reqwest/discussions/1935)
+- [Tracking TCP Keepalives in Docker](https://about.gitlab.com/blog/tracking-down-missing-tcp-keepalives/)
 
 ## License
 

@@ -1,6 +1,5 @@
 use axum::{routing::post, Router};
 use clap::Parser;
-use reqwest::Client;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -39,9 +38,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_state = Arc::new(AppState {
         lark_webhook_url: args.webhook_url,
         miniflux_url: args.miniflux_url,
-        http_client: Client::builder()
-            .build()
-            .expect("无法创建 reqwest 客户端"),
     });
 
     // 拼接监听地址

@@ -6,23 +6,12 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8083:8083"
-    environment:
-      # 飞书机器人 Webhook URL (必填)
-      - WEBHOOK_URL=${WEBHOOK_URL}
-      # Miniflux 服务器地址 (可选)
-      - MINIFLUX_URL=${MINIFLUX_URL:-}
-      # 日志级别 (可选，默认: warn)
-      - RUST_LOG=${RUST_LOG:-warn}
-      # 监听地址 (可选，默认: 0.0.0.0)
-      - IP=${IP:-0.0.0.0}
-      # 监听端口 (可选，默认: 8083)
-      - PORT=${PORT:-8083}
     # 或者直接使用 env_file（推荐）
-    # env_file:
-    #   - .env
+    env_file:
+      - .env
     # Docker 日志轮转配置
     logging:
-      driver: "json-file"
+      driver: "local"
       options:
-        max-size: "256k"
-        max-file: "5"
+        max-size: "10m"
+        mode: "non-blocking"

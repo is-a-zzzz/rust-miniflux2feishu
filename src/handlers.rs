@@ -3,6 +3,7 @@ use axum::{
     http::StatusCode,
 };
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
 
@@ -12,14 +13,20 @@ use crate::models::{
     lark::build_lark_payload,
 };
 
+// 全局互斥锁，确保webhook串行处理
+static WEBHOOK_LOCK: Mutex<()> = Mutex::const_new(());
+
 const MAX_RETRIES: u32 = 3;
 const RETRY_DELAY_MS: u64 = 1000; // 1秒延迟
-const MESSAGE_INTERVAL_MS: u64 = 2500; // 消息间隔2.5秒，避免触发飞书429限流
+const MESSAGE_INTERVAL_MS: u64 = 1000; // 消息间隔1秒，避免触发飞书429限流
 
 pub async fn handle_miniflux_webhook(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<MinifluxWebhook>,
 ) -> StatusCode {
+    // 获取全局锁，确保webhook串行处理
+    let _lock = WEBHOOK_LOCK.lock().await;
+
     if payload.entries.is_empty() {
         return StatusCode::OK; // 没有新文章，正常返回
     }
@@ -48,8 +55,17 @@ pub async fn handle_miniflux_webhook(
         // 尝试发送，支持429重试
         let mut retries = 0;
         loop {
-            match send_to_lark(&state, &lark_payload).await {
-                Ok(true) => {
+
+            // 用 spawn_blocking 在独立线程执行同步HTTP请求
+            let webhook_url = state.lark_webhook_url.clone();
+            let payload_clone = serde_json::to_value(&lark_payload).unwrap();
+
+            match tokio::task::spawn_blocking(move || {
+                send_to_lark_sync(&webhook_url, &payload_clone)
+            })
+            .await
+            {
+                Ok(Ok(true)) => {
                     // 发送成功
                     info!("成功发送第 {} 篇文章到飞书", index + 1);
                     success_count += 1;
@@ -62,7 +78,7 @@ pub async fn handle_miniflux_webhook(
 
                     break;
                 }
-                Ok(false) => {
+                Ok(Ok(false)) => {
                     // 429错误，需要重试（使用指数退避）
                     retries += 1;
                     if retries >= MAX_RETRIES {
@@ -78,9 +94,15 @@ pub async fn handle_miniflux_webhook(
                     );
                     sleep(Duration::from_millis(backoff_ms)).await;
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     // 其他错误，不重试
                     error!("第 {} 篇文章发送失败：{}", index + 1, e);
+                    failed_count += 1;
+                    break;
+                }
+                Err(_e) => {
+                    // spawn_blocking 本身失败（线程panic）
+                    error!("第 {} 篇文章发送失败：线程panic", index + 1);
                     failed_count += 1;
                     break;
                 }
@@ -100,30 +122,29 @@ pub async fn handle_miniflux_webhook(
     }
 }
 
-async fn send_to_lark(
-    state: &Arc<AppState>,
-    lark_payload: &crate::models::lark::LarkMessage,
-) -> Result<bool, String> {
-    let response = state
-        .http_client
-        .post(&state.lark_webhook_url)
-        .json(lark_payload)
-        .send()
-        .await
+// 同步发送HTTP请求到飞书
+fn send_to_lark_sync(webhook_url: &str, payload: &serde_json::Value) -> Result<bool, String> {
+    // 配置 ureq 超时
+    let agent = ureq::AgentBuilder::new()
+        .timeout(std::time::Duration::from_secs(5))
+        .build();
+
+    let response = agent
+        .post(webhook_url)
+        .send_json(payload)
         .map_err(|e| format!("请求失败: {}", e))?;
 
     let status = response.status();
+    let response_text = response.into_string().unwrap_or_else(|_| "无法读取响应体".to_string());
 
-    if status.is_success() {
+    info!("飞书响应：状态码={}, 响应体={}", status, response_text);
+
+    if status == 200 {
         Ok(true)
-    } else if status.as_u16() == 429 {
+    } else if status == 429 {
         // 429 Too Many Requests，需要重试
         Ok(false)
     } else {
-        let text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "无法读取响应体".to_string());
-        Err(format!("状态码 {}，响应：{}", status, text))
+        Err(format!("状态码 {}，响应：{}", status, response_text))
     }
 }

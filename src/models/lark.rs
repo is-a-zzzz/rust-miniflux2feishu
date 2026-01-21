@@ -28,28 +28,22 @@ pub struct LarkLanguageContent {
 #[derive(Debug, Serialize)]
 #[serde(tag = "tag", rename_all = "snake_case")]
 pub enum LarkElement {
+    #[allow(dead_code)]
     Text { text: String },
     A { text: String, href: String },
+    #[allow(dead_code)]
     At { user_id: String },
 }
 
 // --- 辅助函数 ---
 
-// 格式化 RFC3339 时间字符串
-fn format_published_time(published_at: &str) -> String {
-    if published_at.is_empty() {
-        return String::new();
-    }
-
-    // 尝试解析 RFC3339 格式时间
-    if let Ok(datetime) = chrono::DateTime::parse_from_rfc3339(published_at) {
-        // 转换为北京时间 (UTC+8)
-        let beijing_time = datetime.with_timezone(&chrono::FixedOffset::east_opt(8 * 3600).unwrap());
-        // 格式化为：2023-08-17 19:29
-        beijing_time.format("%Y-%m-%d %H:%M").to_string()
-    } else {
-        published_at.to_string()
-    }
+// 格式化 DateTime 为北京时间字符串（预留，暂未使用）
+#[allow(dead_code)]
+fn format_published_time(date: &chrono::DateTime<chrono::Utc>) -> String {
+    // 转换为北京时间 (UTC+8)
+    let beijing_time = date.with_timezone(&chrono::FixedOffset::east_opt(8 * 3600).unwrap());
+    // 格式化为：2025-01-21 10:30:00
+    beijing_time.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
 // --- 构造飞书消息函数 ---
@@ -58,25 +52,13 @@ pub fn build_lark_payload(entry: &MinifluxEntry, miniflux_url: &str) -> LarkMess
     // 构建消息内容
     let mut content = vec![];
 
-    // 如果有发布时间，显示时间
-    if !entry.published_at.is_empty() {
-        let time_str = format_published_time(&entry.published_at);
-        if !time_str.is_empty() {
-            content.push(vec![
-                LarkElement::Text {
-                    text: format!("📅 {}", time_str),
-                },
-            ]);
-        }
-    }
-
-    // Miniflux访问地址（用于标记已读）
+    // Miniflux文章地址
     if !miniflux_url.is_empty() {
-        let miniflux_entry_url = format!("{}/rss/entry/{}", miniflux_url.trim_end_matches('/'), entry.id);
-        tracing::info!("构造 Miniflux URL: {} (entry.id={})", miniflux_entry_url, entry.id);
+        let miniflux_entry_url = format!("{}/rss/feed/{}/entry/{}", miniflux_url.trim_end_matches('/'), entry.feed_id, entry.id);
+        tracing::info!("构造 Miniflux URL: {} (feed_id={}, entry_id={})", miniflux_entry_url, entry.feed_id, entry.id);
         content.push(vec![
             LarkElement::A {
-                text: "📱 Miniflux 查看".to_string(),
+                text: "Miniflux".to_string(),
                 href: miniflux_entry_url,
             },
         ]);
@@ -85,7 +67,7 @@ pub fn build_lark_payload(entry: &MinifluxEntry, miniflux_url: &str) -> LarkMess
     // 原始文章地址
     content.push(vec![
         LarkElement::A {
-            text: "🔗 原文链接".to_string(),
+            text: "原文".to_string(),
             href: entry.url.clone(),
         },
     ]);

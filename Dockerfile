@@ -12,16 +12,16 @@ RUN CARGO_PROFILE_RELEASE_LTO=true \
     cargo install --path . --root /
 
 # 进一步 strip 去除符号
-RUN x86_64-linux-musl-strip /bin/miniflux-webhook || true
+RUN x86_64-linux-musl-strip /bin/rust-miniflux2feishu || true
 
 # ============================================
 # 运行阶段：使用 scratch 裸镜像
 # ============================================
 FROM scratch
-COPY --from=amd64 /bin/miniflux-webhook /miniflux-webhook
+COPY --from=amd64 /bin/rust-miniflux2feishu /rust-miniflux2feishu
 
 # 暴露端口
 EXPOSE 8083
 
 # 启动应用
-ENTRYPOINT ["/miniflux-webhook"]
+ENTRYPOINT ["/rust-miniflux2feishu"]

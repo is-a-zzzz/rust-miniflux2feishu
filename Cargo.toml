@@ -1,5 +1,5 @@
 [package]
-name = "miniflux-webhook"
+name = "rust-miniflux2feishu"
 version = "0.1.0"
 edition = "2021"
 
@@ -17,7 +17,7 @@ serde = { version = "1", features = ["derive"] }
 reqwest = { version = "0.12.25", features = ["json", "rustls-tls"], default-features = false }
 
 # 时间处理
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 
 # 日志
 tracing = "0.1"

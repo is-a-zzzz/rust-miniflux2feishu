@@ -1,0 +1,9 @@
+services:
+  miniflux-webhook:
+    build: .
+    container_name: miniflux-webhook
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8083:8083"
+    env_file:
+      - .env

@@ -33,36 +33,70 @@ pub enum LarkElement {
     At { user_id: String },
 }
 
-// --- 4. 构造飞书消息函数 ---
+// --- 辅助函数 ---
 
-pub fn build_lark_payload(entry: &MinifluxEntry, feed_title: &str) -> LarkMessage {
+// 格式化 RFC3339 时间字符串
+fn format_published_time(published_at: &str) -> String {
+    if published_at.is_empty() {
+        return String::new();
+    }
+
+    // 尝试解析 RFC3339 格式时间
+    if let Ok(datetime) = chrono::DateTime::parse_from_rfc3339(published_at) {
+        // 转换为北京时间 (UTC+8)
+        let beijing_time = datetime.with_timezone(&chrono::FixedOffset::east_opt(8 * 3600).unwrap());
+        // 格式化为：2023-08-17 19:29
+        beijing_time.format("%Y-%m-%d %H:%M").to_string()
+    } else {
+        published_at.to_string()
+    }
+}
+
+// --- 构造飞书消息函数 ---
+
+pub fn build_lark_payload(entry: &MinifluxEntry, miniflux_url: &str) -> LarkMessage {
+    // 构建消息内容
+    let mut content = vec![];
+
+    // 如果有发布时间，显示时间
+    if !entry.published_at.is_empty() {
+        let time_str = format_published_time(&entry.published_at);
+        if !time_str.is_empty() {
+            content.push(vec![
+                LarkElement::Text {
+                    text: format!("📅 {}", time_str),
+                },
+            ]);
+        }
+    }
+
+    // Miniflux访问地址（用于标记已读）
+    if !miniflux_url.is_empty() {
+        let miniflux_entry_url = format!("{}/rss/entry/{}", miniflux_url.trim_end_matches('/'), entry.id);
+        tracing::info!("构造 Miniflux URL: {} (entry.id={})", miniflux_entry_url, entry.id);
+        content.push(vec![
+            LarkElement::A {
+                text: "📱 Miniflux 查看".to_string(),
+                href: miniflux_entry_url,
+            },
+        ]);
+    }
+
+    // 原始文章地址
+    content.push(vec![
+        LarkElement::A {
+            text: "🔗 原文链接".to_string(),
+            href: entry.url.clone(),
+        },
+    ]);
+
     LarkMessage {
         msg_type: "post",
         content: LarkContent {
             post: LarkPost {
                 zh_cn: LarkLanguageContent {
-                    title: format!("Miniflux 更新: {}", feed_title),
-                    content: vec![
-                        // 第一段：@ 所有人
-                        vec![
-                            LarkElement::Text {
-                                text: "有新的订阅文章到达，请查收！".to_string(),
-                            },
-                            LarkElement::At {
-                                user_id: "all".to_string(), // @ 所有人
-                            },
-                        ],
-                        // 第二段：文章链接
-                        vec![
-                            LarkElement::Text {
-                                text: "文章标题: ".to_string(),
-                            },
-                            LarkElement::A {
-                                text: entry.title.clone(),
-                                href: entry.url.clone(),
-                            },
-                        ],
-                    ],
+                    title: entry.title.clone(),
+                    content,
                 },
             },
         },

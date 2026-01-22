@@ -1,1 +1,11 @@
 /target
+
+# 环境变量文件（包含敏感信息）
+.env
+.env.local
+.env.*.local
+
+# Node.js 文件（本项目不需要）
+package.json
+package-lock.json
+node_modules/

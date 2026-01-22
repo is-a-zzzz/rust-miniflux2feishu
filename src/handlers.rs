@@ -72,9 +72,15 @@ pub async fn handle_miniflux_webhook(
                     info!("成功发送第 {} 篇文章到飞书", index + 1);
                     if index < payload.entries.len() - 1 {
                         // 使用 interval 代替 sleep（解决 musl 环境下 sleep 卡住的问题）
+                        eprintln!("[DEBUG-DELAY-{}] 第 {} 篇发送完成，开始 1000ms 延迟", index + 1, index + 1);
+                        let delay_start = std::time::Instant::now();
+
                         let mut timer = interval(Duration::from_millis(1000));
                         timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
                         timer.tick().await;
+
+                        let delay_elapsed = delay_start.elapsed();
+                        eprintln!("[DEBUG-DELAY-{}] interval 等待完成，耗时: {:?}", index + 1, delay_elapsed);
                     }
 
                     eprintln!("[PROCESS-{}] 第 {} 篇文章处理完成", index + 1, index + 1);

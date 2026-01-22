@@ -1,0 +1,34 @@
+{
+  "event_type": "new_entries",
+  "feed": {
+    "id": 99,
+    "user_id": 1,
+    "category_id": 1,
+    "feed_url": "https://example.com/feed",
+    "site_url": "https://example.com",
+    "title": "Single Test",
+    "checked_at": "2025-01-22T10:00:00Z"
+  },
+  "entries": [
+    {
+      "id": 999,
+      "user_id": 1,
+      "feed_id": 99,
+      "status": "unread",
+      "hash": "hash999",
+      "title": "单条测试消息",
+      "url": "https://example.com/test",
+      "comments_url": "https://example.com/test/comments",
+      "published_at": "2025-01-22T10:00:00Z",
+      "created_at": "2025-01-22T10:00:00Z",
+      "changed_at": "2025-01-22T10:00:00Z",
+      "content": "这是一条测试消息",
+      "author": "测试作者",
+      "share_code": "test999",
+      "starred": false,
+      "reading_time": 1,
+      "enclosures": [],
+      "tags": []
+    }
+  ]
+}

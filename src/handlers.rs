@@ -5,6 +5,7 @@ use axum::{
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
+use tokio::time::{interval, MissedTickBehavior};
 use tracing::{error, info, warn};
 
 use crate::state::AppState;
@@ -69,15 +70,11 @@ pub async fn handle_miniflux_webhook(
                     // 发送成功
                     eprintln!("[HTTP-{}] 请求成功", index + 1);
                     info!("成功发送第 {} 篇文章到飞书", index + 1);
-
-                    // 如果不是最后一篇，添加延迟
                     if index < payload.entries.len() - 1 {
-                        eprintln!("[DELAY-{}] 开始等待 100ms", index + 1);
-
-                        // 使用 tokio::time::sleep（100ms 稳定，1000ms 会卡住）
-                        tokio::time::sleep(Duration::from_millis(100)).await;
-
-                        eprintln!("[DELAY-{}] 等待完成", index + 1);
+                        // 使用 interval 代替 sleep（解决 musl 环境下 sleep 卡住的问题）
+                        let mut timer = interval(Duration::from_millis(1000));
+                        timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                        timer.tick().await;
                     }
 
                     eprintln!("[PROCESS-{}] 第 {} 篇文章处理完成", index + 1, index + 1);
@@ -99,10 +96,11 @@ pub async fn handle_miniflux_webhook(
                         "遇到429限流，第 {} 次重试（{}ms 后）...",
                         retries, backoff_ms
                     );
-                    eprintln!("[RETRY-{}] 等待 {}ms 后重试", index + 1, backoff_ms);
 
-                    // 使用 tokio::time::sleep
-                    tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                    // 429 时使用 interval 延迟重试
+                    let mut timer = interval(Duration::from_millis(backoff_ms));
+                    timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                    timer.tick().await;
                 }
                 Err(e) => {
                     // 其他错误，不重试
